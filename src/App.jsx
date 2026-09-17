@@ -328,11 +328,19 @@ export default function App() {
   // Grupos y compras
   const [grupos, setGrupos]       = useState(new Set(["pisos","muros","dotacion","puertas"]));
   // Desbloqueo manual (transferencia Nequi / Daviplata + código)
-  const [isPaid, setIsPaid]       = useState(false);
-  const [refPago]                 = useState(()=>{
+  // La referencia se guarda en el navegador: si el usuario recarga, abre el panel
+  // o cierra la pestaña, sigue siendo la misma. Sin esto, el código que ya se
+  // entregó dejaría de corresponder.
+  const [refPago] = useState(()=>{
+    try{ const g = localStorage.getItem("remodelapp_ref"); if(g) return g; }catch{}
     const abc = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";          // sin O/0/I/1/L
     let c = ""; for(let i=0;i<4;i++) c += abc[Math.floor(Math.random()*abc.length)];
-    return "RA-"+c;
+    const nueva = "RA-"+c;
+    try{ localStorage.setItem("remodelapp_ref", nueva); }catch{}
+    return nueva;
+  });
+  const [isPaid, setIsPaid] = useState(()=>{
+    try{ return localStorage.getItem("remodelapp_ok") === "1"; }catch{ return false; }
   });
   const [codigo, setCodigo]       = useState("");
   const [verificando, setVerif]   = useState(false);
@@ -405,8 +413,11 @@ export default function App() {
         body:JSON.stringify({ref:refPago, codigo}),
       });
       const j = await r.json().catch(()=>({}));
-      if(r.ok && j.ok){ setIsPaid(true); }
-      else setErrorCod(j.error || "Ese código no corresponde a tu referencia. Revísalo o escríbeme.");
+      if(r.ok && j.ok){
+        setIsPaid(true);
+        try{ localStorage.setItem("remodelapp_ok","1"); }catch{}
+      }
+      else setErrorCod(j.error || `Ese código no corresponde a la referencia ${refPago}. Verifica que sea la misma que me enviaste.`);
     }catch{
       setErrorCod("No pude verificar el código. Revisa tu conexión e intenta otra vez.");
     }finally{ setVerif(false); }
@@ -897,7 +908,7 @@ function PagoManual({refPago,codigo,setCodigo,verificando,errorCod,onVerificar,g
 
         <div style={{fontSize:11,color:"rgba(255,255,255,.35)",lineHeight:1.6,marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.1)"}}>
           El desbloqueo es manual: reviso la transferencia y te envío el código. Normalmente en menos de 12 horas.
-          Tu referencia solo sirve en este dispositivo, así que no cierres esta pestaña hasta desbloquear.
+          Tu referencia queda guardada en este navegador, así que puedes cerrar y volver: seguirá siendo la misma.
         </div>
       </div>
     </div>
